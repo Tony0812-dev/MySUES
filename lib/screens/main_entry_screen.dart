@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mysues/services/theme_service.dart';
 import 'package:mysues/widgets/liquid_glass_bottom_bar.dart';
@@ -8,6 +9,8 @@ import 'schedule_screen.dart';
 import 'transcript_screen.dart';
 import 'exam_info_screen.dart';
 import 'profile_screen.dart';
+import 'about/user_agreement_screen.dart';
+import 'about/privacy_policy_screen.dart';
 
 class MainEntryScreen extends StatefulWidget {
   const MainEntryScreen({super.key});
@@ -35,55 +38,88 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
 
   Future<void> _checkFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
-    final disclaimerShown = prefs.getBool('disclaimer_shown') ?? false;
-    if (!disclaimerShown && mounted) {
+    final agreementAccepted = prefs.getBool('agreement_accepted') ?? false;
+    if (!agreementAccepted && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showDisclaimerDialog();
+        _showAgreementDialog();
       });
     }
   }
 
-  void _showDisclaimerDialog() {
+  void _showAgreementDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('免责声明'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '您当前使用的版本为 1.0.0-alpha+1，并非最终版本。',
-                style: TextStyle(fontWeight: FontWeight.bold),
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: const Text('用户协议与隐私政策'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('欢迎使用苏伊士（My SUES）。在使用本应用前，请您仔细阅读并同意以下协议：'),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(dialogContext).push(
+                      MaterialPageRoute(builder: (_) => const UserAgreementScreen()),
+                    );
+                  },
+                  child: Text(
+                    '《用户协议》',
+                    style: TextStyle(
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(dialogContext).push(
+                      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                    );
+                  },
+                  child: Text(
+                    '《隐私政策》',
+                    style: TextStyle(
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '点击「同意并继续」表示您已阅读并同意以上协议。',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (Platform.isAndroid) {
+                    SystemNavigator.pop();
+                  } else {
+                    exit(0);
+                  }
+                },
+                child: const Text('不同意'),
               ),
-              SizedBox(height: 12),
-              Text(
-                '本应用目前处于早期测试阶段，部分功能可能存在不稳定的情况。'
-                '使用过程中可能会遇到数据异常、功能缺失或其他未知问题。',
+              FilledButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('agreement_accepted', true);
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                },
+                child: const Text('同意并继续'),
               ),
-              SizedBox(height: 8),
-              Text(
-                '本应用仅供学习交流使用，与上海工程技术大学官方无关。'
-                '开发者不对因使用本应用而产生的任何直接或间接损失承担责任。',
-              ),
-              SizedBox(height: 8),
-              Text('如遇到问题，欢迎联系作者进行反馈。感谢您的理解与支持！'),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('disclaimer_shown', true);
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('我已知晓'),
-            ),
-          ],
         );
       },
     );
