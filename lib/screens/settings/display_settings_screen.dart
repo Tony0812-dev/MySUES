@@ -1,5 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:mysues/services/theme_service.dart';
 
 class DisplaySettingsScreen extends StatefulWidget {
@@ -11,6 +13,7 @@ class DisplaySettingsScreen extends StatefulWidget {
 
 class _DisplaySettingsScreenState extends State<DisplaySettingsScreen> {
   bool _liquidGlassEnabled = false;
+  double? _previewOpacity;
 
   @override
   void initState() {
@@ -19,9 +22,9 @@ class _DisplaySettingsScreenState extends State<DisplaySettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    // We can get the value from ThemeService if it is initialized, or prefs
     setState(() {
-      _liquidGlassEnabled = prefs.getBool('liquid_glass_beta') ?? false;
+      _liquidGlassEnabled = ThemeService().liquidGlassEnabled; // Try service first
     });
   }
 
@@ -31,8 +34,7 @@ class _DisplaySettingsScreenState extends State<DisplaySettingsScreen> {
   }
 
   Future<void> _saveLiquidGlass(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('liquid_glass_beta', value);
+    await ThemeService().updateLiquidGlass(value);
     setState(() {
       _liquidGlassEnabled = value;
     });
@@ -61,6 +63,82 @@ class _DisplaySettingsScreenState extends State<DisplaySettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showThemePicker(themeModeIndex),
           ),
+          ListTile(
+            title: const Text('设置背景图片'),
+            subtitle: Text(
+              ThemeService().backgroundImagePath != null ? '已设置' : '未设置',
+            ),
+            trailing: ThemeService().backgroundImagePath != null
+                ? IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () async {
+                      await ThemeService().clearBackgroundImage();
+                      setState(() {});
+                    },
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: () => _pickBackgroundImage(),
+          ),
+          if (ThemeService().backgroundImagePath != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Checkerboard-like background to show transparency
+                      Container(color: Theme.of(context).scaffoldBackgroundColor),
+                      Opacity(
+                        opacity: _previewOpacity ?? ThemeService().backgroundOpacity,
+                        child: Image.file(
+                          File(ThemeService().backgroundImagePath!),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (ThemeService().backgroundImagePath != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  const Text('背景透明度'),
+                  Expanded(
+                    child: Slider(
+                      value: _previewOpacity ?? ThemeService().backgroundOpacity,
+                      min: 0.1,
+                      max: 1.0,
+                      divisions: 9,
+                      label: '${((_previewOpacity ?? ThemeService().backgroundOpacity) * 100).round()}%',
+                      onChanged: (value) {
+                        setState(() {
+                          _previewOpacity = value;
+                        });
+                      },
+                      onChangeEnd: (value) async {
+                        await ThemeService().updateBackgroundOpacity(value);
+                        setState(() {
+                          _previewOpacity = null;
+                        });
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 40,
+                    child: Text(
+                      '${((_previewOpacity ?? ThemeService().backgroundOpacity) * 100).round()}%',
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const Divider(),
           _buildSectionHeader('字体'),
           ListTile(
@@ -112,6 +190,14 @@ class _DisplaySettingsScreenState extends State<DisplaySettingsScreen> {
     if (family == 'HarmonyOS Sans') return 'HarmonyOS Sans';
     if (family == 'MiSans') return 'MiSans';
     return family;
+  }
+
+  Future<void> _pickBackgroundImage() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.single.path != null) {
+      await ThemeService().updateBackgroundImage(result.files.single.path!);
+      if (mounted) setState(() {});
+    }
   }
 
   void _showThemePicker(int currentIndex) {

@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import '../models/course.dart';
 import '../models/schedule_table.dart';
 import '../models/time_table.dart'; // Import Time models
 import '../services/schedule_service.dart';
+import '../services/theme_service.dart';
 import 'add_course_screen.dart';
 import 'schedule_settings_screen.dart';
 import 'import_classpdf_screen.dart'; // Import
@@ -113,16 +117,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF5F5F7), // Light grey background
-            borderRadius: BorderRadius.only(
+        final isLiquidGlass = ThemeService().liquidGlassEnabled;
+        final theme = Theme.of(context);
+
+        Widget sheet = Container(
+          decoration: isLiquidGlass ? null : BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
           ),
           padding: const EdgeInsets.only(top: 8),
-          height: MediaQuery.of(context).size.height * 0.75, // Take up typical sheet height
+          height: MediaQuery.of(context).size.height * 0.75,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -185,7 +192,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                        Container(
                          margin: const EdgeInsets.symmetric(horizontal: 16),
                          decoration: BoxDecoration(
-                           color: Colors.white,
+                           color: Theme.of(context).cardColor,
                            borderRadius: BorderRadius.circular(16),
                          ),
                          child: Column(
@@ -226,7 +233,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         Container(
                          margin: const EdgeInsets.symmetric(horizontal: 16),
                          decoration: BoxDecoration(
-                           color: Colors.white,
+                           color: Theme.of(context).cardColor,
                            borderRadius: BorderRadius.circular(16),
                          ),
                          child: Column(
@@ -262,6 +269,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ],
           ),
         );
+
+        if (isLiquidGlass) {
+          final brightness = MediaQuery.platformBrightnessOf(context);
+          final isDark = brightness == Brightness.dark;
+          sheet = LiquidGlass.withOwnLayer(
+            settings: LiquidGlassSettings.figma(
+              depth: 50,
+              refraction: 100,
+              dispersion: 4,
+              frost: 2,
+              lightAngle: math.pi / 4,
+              glassColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+              lightIntensity: isDark ? 70 : 50,
+            ),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 20),
+            child: Material(
+              color: Colors.transparent,
+              child: sheet,
+            ),
+          );
+        }
+
+        return sheet;
       },
     );
   }
@@ -474,87 +504,99 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ),
         centerTitle: true,
         actions: [
-          MenuAnchor(
-            builder: (BuildContext context, MenuController controller, Widget? child) {
-              return IconButton(
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
-                },
-                icon: const Icon(Icons.more_vert),
-                tooltip: '菜单',
-              );
-            },
-            menuChildren: [
-              SubmenuButton(
-                leadingIcon: const Icon(Icons.download),
-                menuChildren: [
-                  MenuItemButton(
-                    leadingIcon: const Icon(Icons.sync_alt),
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => const LoginWebviewScreen()),
-                      );
-                      if (result == true) {
-                        _initData();
+          ListenableBuilder(
+            listenable: ThemeService(),
+            builder: (context, _) {
+              if (ThemeService().liquidGlassEnabled) {
+                return IconButton(
+                  onPressed: () => _showLiquidGlassMenu(context),
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: '菜单',
+                );
+              }
+              return MenuAnchor(
+                builder: (BuildContext context, MenuController controller, Widget? child) {
+                  return IconButton(
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
                       }
                     },
-                    child: const Text('从教务导入'),
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: '菜单',
+                  );
+                },
+                menuChildren: [
+                  SubmenuButton(
+                    leadingIcon: const Icon(Icons.download),
+                    menuChildren: [
+                      MenuItemButton(
+                        leadingIcon: const Icon(Icons.sync_alt),
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (c) => const LoginWebviewScreen()),
+                          );
+                          if (result == true) {
+                            _initData();
+                          }
+                        },
+                        child: const Text('从教务导入'),
+                      ),
+                      MenuItemButton(
+                        leadingIcon: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (c) => const ImportClassPdfScreen()),
+                          );
+                          if (result != null) {
+                            _initData();
+                          }
+                        },
+                        child: const Text('从PDF导入'),
+                      ),
+                    ],
+                    child: const Text('导入课表'),
                   ),
                   MenuItemButton(
-                    leadingIcon: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+                    leadingIcon: const Icon(Icons.add),
                     onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => const ImportClassPdfScreen()),
-                      );
-                      if (result != null) {
-                        _initData();
+                      if (_currentTable != null) {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (c) => AddCourseScreen(course: null)),
+                        );
+                        if (result != null && result is Course) {
+                          result.tableId = _currentTable!.id;
+                          await ScheduleDataService.addCourse(result);
+                          _initData();
+                        }
                       }
                     },
-                    child: const Text('从PDF导入'),
+                    child: const Text('添加课程'),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.settings),
+                    onPressed: () async {
+                      if (_currentTable != null) {
+                        final newTable = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!)),
+                        );
+                        if (newTable != null && newTable is ScheduleTable) {
+                          await ScheduleDataService.updateScheduleTable(newTable);
+                          _initData();
+                        }
+                      }
+                    },
+                    child: const Text('课表设置'),
                   ),
                 ],
-                child: const Text('导入课表'),
-              ), 
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.add),
-                onPressed: () async {
-                  if (_currentTable != null) {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (c) => AddCourseScreen(course: null)), 
-                    );
-                    if (result != null && result is Course) {
-                      result.tableId = _currentTable!.id; // Ensure table ID is set
-                      await ScheduleDataService.addCourse(result);
-                      _initData();
-                    }
-                  }
-                },
-                child: const Text('添加课程'),
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.settings),
-                onPressed: () async {
-                  if (_currentTable != null) {
-                    final newTable = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!)),
-                    );
-                    if (newTable != null && newTable is ScheduleTable) {
-                      await ScheduleDataService.updateScheduleTable(newTable);
-                      _initData();
-                    }
-                  }
-                },
-                child: const Text('课表设置'),
-              ),
-            ],
+              );
+            },
           ),
         ],
       ),
@@ -582,6 +624,178 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
            }
         },
         child: const Icon(Icons.today),
+      ),
+    );
+  }
+
+  void _showLiquidGlassMenu(BuildContext context) {
+    final theme = Theme.of(context);
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isDark = brightness == Brightness.dark;
+    final baseColor = theme.colorScheme.surface;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss menu',
+      barrierColor: Colors.black12,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: kToolbarHeight, right: 8),
+              child: LiquidGlass.withOwnLayer(
+                settings: LiquidGlassSettings(
+                  refractiveIndex: 1.21,
+                  thickness: 30,
+                  blur: 8,
+                  saturation: 1.5,
+                  lightIntensity: isDark ? .7 : 1,
+                  ambientStrength: isDark ? .2 : .5,
+                  lightAngle: math.pi / 4,
+                  glassColor: baseColor.withValues(alpha: 0.6),
+                ),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                child: Material(
+                  color: Colors.transparent,
+                  child: IntrinsicWidth(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 180),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                            child: Text(
+                              '导入课表',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.sync_alt,
+                            label: '从教务导入',
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (c) => const LoginWebviewScreen()),
+                              );
+                              if (result == true) _initData();
+                            },
+                          ),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.picture_as_pdf,
+                            iconColor: Colors.redAccent,
+                            label: '从PDF导入',
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (c) => const ImportClassPdfScreen()),
+                              );
+                              if (result != null) _initData();
+                            },
+                          ),
+                          Divider(height: 1, indent: 16, endIndent: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.1)),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.add,
+                            label: '添加课程',
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              if (_currentTable != null) {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (c) => AddCourseScreen(course: null)),
+                                );
+                                if (result != null && result is Course) {
+                                  result.tableId = _currentTable!.id;
+                                  await ScheduleDataService.addCourse(result);
+                                  _initData();
+                                }
+                              }
+                            },
+                          ),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.settings,
+                            label: '课表设置',
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              if (_currentTable != null) {
+                                final newTable = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!)),
+                                );
+                                if (newTable != null && newTable is ScheduleTable) {
+                                  await ScheduleDataService.updateScheduleTable(newTable);
+                                  _initData();
+                                }
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            alignment: Alignment.topRight,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLiquidGlassMenuItem({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: iconColor ?? theme.colorScheme.onSurface),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

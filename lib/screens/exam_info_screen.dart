@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import '../models/exam.dart';
 import '../services/exam_service.dart';
+import '../services/theme_service.dart';
 import 'add_exam_screen.dart';
 import 'login_webview_screen.dart';
 
@@ -89,52 +93,64 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
         title: const Text('考试信息'),
         centerTitle: true,
         actions: [
-          MenuAnchor(
-            builder: (BuildContext context, MenuController controller, Widget? child) {
-              return IconButton(
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
+          ListenableBuilder(
+            listenable: ThemeService(),
+            builder: (context, _) {
+              if (ThemeService().liquidGlassEnabled) {
+                return IconButton(
+                  onPressed: () => _showLiquidGlassMenu(context),
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: '菜单',
+                );
+              }
+              return MenuAnchor(
+                builder: (BuildContext context, MenuController controller, Widget? child) {
+                  return IconButton(
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: '菜单',
+                  );
                 },
-                icon: const Icon(Icons.more_vert),
-                tooltip: '菜单',
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.sync_alt),
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginWebviewScreen(),
+                        ),
+                      );
+                      // LoginWebviewScreen returns true if data changed
+                      if (result == true && mounted) {
+                        await _loadExams();
+                      }
+                    },
+                    child: const Text('从教务处导入'),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.add, color: Colors.grey),
+                    onPressed: () {
+                      _navigateToAddExam();
+                    },
+                    child: const Text('添加自定义考试'),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.delete_outline, color: Colors.grey),
+                    onPressed: () {
+                      _clearFinishedExams();
+                    },
+                    child: const Text('清除已结束'),
+                  ),
+                ],
               );
             },
-            menuChildren: [
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.sync_alt),
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginWebviewScreen(),
-                    ),
-                  );
-                  // LoginWebviewScreen returns true if data changed
-                  if (result == true && mounted) {
-                    await _loadExams();
-                  }
-                },
-                child: const Text('从教务处导入'),
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.add, color: Colors.grey),
-                onPressed: () {
-                  _navigateToAddExam();
-                },
-                child: const Text('添加自定义考试'),
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.delete_outline, color: Colors.grey),
-                onPressed: () {
-                  _clearFinishedExams();
-                },
-                child: const Text('清除已结束'),
-              ),
-            ],
           ),
         ],
       ),
@@ -193,6 +209,139 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
     );
   }
 
+  void _showLiquidGlassMenu(BuildContext context) {
+    final theme = Theme.of(context);
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isDark = brightness == Brightness.dark;
+    final baseColor = theme.colorScheme.surface;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss menu',
+      barrierColor: Colors.black12,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: kToolbarHeight, right: 8),
+              child: LiquidGlass.withOwnLayer(
+                settings: LiquidGlassSettings(
+                  refractiveIndex: 1.21,
+                  thickness: 30,
+                  blur: 8,
+                  saturation: 1.5,
+                  lightIntensity: isDark ? .7 : 1,
+                  ambientStrength: isDark ? .2 : .5,
+                  lightAngle: math.pi / 4,
+                  glassColor: baseColor.withValues(alpha: 0.6),
+                ),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                child: Material(
+                  color: Colors.transparent,
+                  child: IntrinsicWidth(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 180),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 4),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.sync_alt,
+                            label: '从教务处导入',
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginWebviewScreen(),
+                                ),
+                              );
+                              if (result == true && mounted) {
+                                await _loadExams();
+                              }
+                            },
+                          ),
+                          Divider(height: 1, indent: 16, endIndent: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.1)),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.add,
+                            label: '添加自定义考试',
+                            onTap: () {
+                              Navigator.pop(dialogContext);
+                              _navigateToAddExam();
+                            },
+                          ),
+                          _buildLiquidGlassMenuItem(
+                            context: dialogContext,
+                            icon: Icons.delete_outline,
+                            label: '清除已结束',
+                            onTap: () {
+                              Navigator.pop(dialogContext);
+                              _clearFinishedExams();
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            alignment: Alignment.topRight,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLiquidGlassMenuItem({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: iconColor ?? theme.colorScheme.onSurface),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _clearFinishedExams() async {
     await ExamService.clearFinishedExams();
     _loadExams();
@@ -221,16 +370,19 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF5F5F7), // Light grey background
-            borderRadius: BorderRadius.only(
+        final isLiquidGlass = ThemeService().liquidGlassEnabled;
+        final theme = Theme.of(context);
+
+        Widget sheet = Container(
+          decoration: isLiquidGlass ? null : BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
           ),
           padding: const EdgeInsets.only(top: 8),
-          height: MediaQuery.of(context).size.height * 0.75, // Take up typical sheet height
+          height: MediaQuery.of(context).size.height * 0.75,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -310,7 +462,7 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
                        Container(
                          margin: const EdgeInsets.symmetric(horizontal: 16),
                          decoration: BoxDecoration(
-                           color: Colors.white,
+                           color: Theme.of(context).cardColor,
                            borderRadius: BorderRadius.circular(16),
                          ),
                          child: Column(
@@ -347,7 +499,7 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
                         Container(
                          margin: const EdgeInsets.symmetric(horizontal: 16),
                          decoration: BoxDecoration(
-                           color: Colors.white,
+                           color: Theme.of(context).cardColor,
                            borderRadius: BorderRadius.circular(16),
                          ),
                          child: Column(
@@ -383,6 +535,29 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
             ],
           ),
         );
+
+        if (isLiquidGlass) {
+          final brightness = MediaQuery.platformBrightnessOf(context);
+          final isDark = brightness == Brightness.dark;
+          sheet = LiquidGlass.withOwnLayer(
+            settings: LiquidGlassSettings.figma(
+              depth: 50,
+              refraction: 100,
+              dispersion: 4,
+              frost: 2,
+              lightAngle: math.pi / 4,
+              glassColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+              lightIntensity: isDark ? 70 : 50,
+            ),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 20),
+            child: Material(
+              color: Colors.transparent,
+              child: sheet,
+            ),
+          );
+        }
+
+        return sheet;
       },
     );
   }
@@ -424,7 +599,82 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
 
   Widget _buildExamCard(Exam exam) {
     final bool isTodayExam = _isToday(exam.timeString);
-    
+    final isLiquidGlass = ThemeService().liquidGlassEnabled;
+
+    final content = Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  exam.courseName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              _buildStatusBadge(exam.status),
+            ],
+          ),
+          const Divider(height: 24),
+          _buildInfoRow(Icons.access_time, '时间', exam.timeString),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.location_on_outlined, '地点', exam.location),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.category_outlined, '类型', exam.type),
+          if (isTodayExam) ...[
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                SizedBox(width: 4),
+                Text(
+                  '今日考试，请注意时间！',
+                  style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (isLiquidGlass) {
+      final theme = Theme.of(context);
+      final brightness = MediaQuery.platformBrightnessOf(context);
+      final isDark = brightness == Brightness.dark;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: GestureDetector(
+          onTap: () => _showExamDetails(exam),
+          child: LiquidGlass.withOwnLayer(
+            settings: LiquidGlassSettings(
+              refractiveIndex: 1.21,
+              thickness: 30,
+              blur: 8,
+              saturation: 1.5,
+              lightIntensity: isDark ? .7 : 1,
+              ambientStrength: isDark ? .2 : .5,
+              lightAngle: math.pi / 4,
+              glassColor: isTodayExam
+                  ? Colors.orange.withValues(alpha: 0.3)
+                  : theme.colorScheme.surface.withValues(alpha: 0.6),
+            ),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 36),
+            child: Material(
+              color: Colors.transparent,
+              child: content,
+            ),
+          ),
+        ),
+      );
+    }
+
     return InkWell(
       onTap: () => _showExamDetails(exam),
       child: Card(
@@ -435,48 +685,7 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
           borderRadius: BorderRadius.circular(12),
           side: isTodayExam ? const BorderSide(color: Colors.orange, width: 2) : BorderSide.none,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      exam.courseName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  _buildStatusBadge(exam.status),
-                ],
-              ),
-              const Divider(height: 24),
-              _buildInfoRow(Icons.access_time, '时间', exam.timeString),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.location_on_outlined, '地点', exam.location),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.category_outlined, '类型', exam.type),
-              if (isTodayExam) ...[
-                const SizedBox(height: 8),
-                const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      '今日考试，请注意时间！',
-                      style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }
