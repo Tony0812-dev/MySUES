@@ -122,7 +122,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
         Widget sheet = Container(
           decoration: isLiquidGlass ? null : BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
+            color: theme.colorScheme.surface,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
