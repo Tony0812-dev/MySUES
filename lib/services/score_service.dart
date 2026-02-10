@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/score.dart';
 
@@ -6,6 +7,9 @@ class ScoreService {
   static const String _scoresKey = 'student_scores';
   static const String _lastImportTimeKey = 'last_import_time';
   static const String _lastImportMethodKey = 'last_import_method';
+
+  /// Notifies listeners when scores are updated (saved or cleared).
+  static final ValueNotifier<int> updateNotifier = ValueNotifier(0);
 
   static Future<List<Score>> loadScores() async {
     final prefs = await SharedPreferences.getInstance();
@@ -24,6 +28,7 @@ class ScoreService {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = jsonEncode(scores.map((e) => e.toJson()).toList());
     await prefs.setString(_scoresKey, jsonString);
+    updateNotifier.value++;
   }
 
   static Future<Map<String, String?>> loadImportInfo() async {
@@ -45,5 +50,6 @@ class ScoreService {
     await prefs.remove(_scoresKey);
     await prefs.remove(_lastImportTimeKey);
     await prefs.remove(_lastImportMethodKey);
+    updateNotifier.value++;
   }
 }

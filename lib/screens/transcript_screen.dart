@@ -32,6 +32,17 @@ class _TranscriptScreenState extends State<TranscriptScreen> {
     _semesters = [];
     _selectedSemester = '无数据';
     _loadScores();
+    ScoreService.updateNotifier.addListener(_onScoresUpdated);
+  }
+
+  @override
+  void dispose() {
+    ScoreService.updateNotifier.removeListener(_onScoresUpdated);
+    super.dispose();
+  }
+
+  void _onScoresUpdated() {
+    _loadScores();
   }
 
   Future<void> _loadScores() async {
