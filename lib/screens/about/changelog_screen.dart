@@ -15,7 +15,7 @@ class ChangelogScreen extends StatelessWidget {
         children: [
           _buildVersionCard(
             context,
-            version: '0.1.1-beta.1',
+            version: '0.2.0-beta.1',
             date: '2026-02-19',
             changes: [
               '🌟 支持课程提醒通知，上课前 15 分钟推送提醒，显示课程名称和教室信息',

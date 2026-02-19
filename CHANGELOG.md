@@ -2,7 +2,7 @@
 
 MySUES follows [Semantic Versioning 2.0.0](http://semver.org/).
 
-## 0.1.1-beta.1
+## 0.2.0-beta.1
 
 `2026-02-19`
 
