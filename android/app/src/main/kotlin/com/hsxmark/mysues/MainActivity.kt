@@ -1,4 +1,4 @@
-package com.example.mysues
+package com.hsxmark.mysues
 
 import io.flutter.embedding.android.FlutterActivity
 
