@@ -60,34 +60,68 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('欢迎使用苏伊士（My SUES）。在使用本应用前，请您仔细阅读并同意以下协议：'),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(dialogContext).push(
-                      MaterialPageRoute(builder: (_) => const UserAgreementScreen()),
-                    );
-                  },
-                  child: Text(
-                    '《用户协议》',
-                    style: TextStyle(
-                      color: Theme.of(dialogContext).colorScheme.primary,
-                      decoration: TextDecoration.underline,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.article_outlined, size: 18, color: Theme.of(dialogContext).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(dialogContext).push(
+                          MaterialPageRoute(builder: (_) => const UserAgreementScreen()),
+                        );
+                      },
+                      child: Text(
+                        '《用户协议》',
+                        style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(dialogContext).push(
-                      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-                    );
-                  },
-                  child: Text(
-                    '《隐私政策》',
-                    style: TextStyle(
-                      color: Theme.of(dialogContext).colorScheme.primary,
-                      decoration: TextDecoration.underline,
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.shield_outlined, size: 18, color: Theme.of(dialogContext).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(dialogContext).push(
+                          MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                        );
+                      },
+                      child: Text(
+                        '《隐私政策》',
+                        style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '重要提示：本产品为公益性质的完全免费产品，若您是通过付费获取本产品那您遭遇了诈骗。',
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade900, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
