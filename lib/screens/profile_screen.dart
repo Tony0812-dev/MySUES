@@ -8,6 +8,7 @@ import 'package:mysues/screens/settings/settings_screen.dart';
 import 'package:mysues/screens/about_screen.dart';
 import 'package:mysues/screens/login_webview_screen.dart'; // Import this
 import 'package:mysues/services/theme_service.dart';
+import 'package:mysues/utils/sync_disclaimer.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'dart:math' as math;
 // Ensure Course is imported
@@ -24,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _studentId;
   String? _name; 
   int _currentWeek = 1; // Default
-  int _totalWeeks = 20; // Default
+  int _totalWeeks = 30; // Default
 
   File? _avatarFile;
   String? _major;
@@ -477,12 +478,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _navigateToWebLogin() async {
+    if (!await showSyncDisclaimer(context)) return;
+
+    if (!mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const LoginWebviewScreen()),
     );
-    // Refresh timestamp after return specific key update
-    _loadData(); 
+    if (!mounted) return;
+    _loadData();
   }
 } // End of class
 
