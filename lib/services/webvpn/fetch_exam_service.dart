@@ -204,6 +204,8 @@ class FetchExamService {
   }
 
   /// 通过异步 XHR 获取页面内容（兼容 iOS WKWebView，不使用同步 XHR）
+  /// 注意：考试接口返回完整 HTML 页面，iOS WKWebView 的 JS 桥在传递大字符串时
+  /// 可能截断或编码异常，因此在 JS 侧预提取 <table> 元素以减少传输数据量。
   static Future<String?> _fetchWithXhr(WebViewController controller, String url) async {
     try {
       final safeUrl = url.replaceAll("'", "\\'");
@@ -218,9 +220,20 @@ class FetchExamService {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '$safeUrl', true);
             xhr.withCredentials = true;
+            xhr.setRequestHeader('Accept', 'text/html, application/json, */*');
             xhr.onload = function() {
               if (xhr.status >= 200 && xhr.status < 300) {
-                window['$key'] = xhr.responseText;
+                try {
+                  var doc = new DOMParser().parseFromString(xhr.responseText, 'text/html');
+                  var tables = doc.querySelectorAll('table');
+                  var html = '';
+                  for (var i = 0; i < tables.length; i++) {
+                    html += tables[i].outerHTML;
+                  }
+                  window['$key'] = html || xhr.responseText;
+                } catch(pe) {
+                  window['$key'] = xhr.responseText;
+                }
               } else {
                 window['$key'] = 'JS_ERROR: HTTP ' + xhr.status + ' ' + xhr.statusText;
               }

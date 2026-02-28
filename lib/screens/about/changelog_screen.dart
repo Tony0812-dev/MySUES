@@ -15,6 +15,21 @@ class ChangelogScreen extends StatelessWidget {
         children: [
           _buildVersionCard(
             context,
+            version: '0.4.0-beta.1',
+            date: '2026-02-28',
+            changes: [
+              '🌟 在更多页面添加公告入口',
+              '🌟 在同步按钮中添加操作提示',
+              '🐛 修复 iOS 端提取考试信息高概率失败的问题',
+              '🛠 重写考试数据提取流程，确保页面会话就绪后再请求数据',
+              '🛠 为考试提取添加自动重试机制（最多 3 次），解决 iOS 首次请求失败的问题',
+              '🛠 延长页面加载等待时间至 30 秒，适配教务系统慢响应',
+              '🛠 更新应用包名',
+            ],
+            isLatest: true,
+          ),
+          _buildVersionCard(
+            context,
             version: '0.3.1-beta.1',
             date: '2026-02-27',
             changes: [
@@ -22,7 +37,6 @@ class ChangelogScreen extends StatelessWidget {
               '🐛 修复课表最大周数默认值，从 20 调整为 30',
               '🛠 改进课表切换底部弹窗 UI',
             ],
-            isLatest: true,
           ),
           _buildVersionCard(
             context,
