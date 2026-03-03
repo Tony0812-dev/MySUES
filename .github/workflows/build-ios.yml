@@ -1,8 +1,7 @@
 name: Flutter_iOS
 
 on:
-  push:
-    branches: [master]
+  workflow_dispatch: 
 
 jobs:
   build_ios:
