@@ -20,7 +20,7 @@ jobs:
       run: flutter pub get
       
     - name: Build Flutter
-      run: flutter build ios --release --no-codesign
+      run: flutter build ipa --release --no-codesign
 
     - name: Publish iOS Artefacts
       uses: actions/upload-artifact@v4
