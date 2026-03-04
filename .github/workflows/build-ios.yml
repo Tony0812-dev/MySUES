@@ -15,7 +15,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-flutter
       with:
-        path: /root/flutter-sdk 
+        path: /Users/runner/hostedtoolcache/flutter
         key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
 
     - name: Install and set Flutter version
