@@ -498,8 +498,9 @@ class _TranscriptScreenState extends State<TranscriptScreen> {
 
   Widget _buildOverallCard(double totalGPA) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: BoxDecoration(
         color: Theme.of(context).primaryColor,
         borderRadius: BorderRadius.circular(16),
@@ -511,20 +512,32 @@ class _TranscriptScreenState extends State<TranscriptScreen> {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          const Text(
-            "总平均绩点 (GPA)",
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            totalGPA.toStringAsFixed(2),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "总平均绩点 (GPA)",
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  totalGPA.toStringAsFixed(2),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 42,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
+          ),
+          Icon(
+            Icons.school_rounded,
+            size: 48,
+            color: Colors.white.withOpacity(0.3),
           ),
         ],
       ),
