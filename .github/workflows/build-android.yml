@@ -39,7 +39,7 @@ jobs:
       - name: flutter build apk
         run: flutter build apk --release
 
-      - name: Publish iOS Artefacts
+      - name: Publish Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-android
