@@ -4,6 +4,7 @@ class AcknowledgementsScreen extends StatelessWidget {
   const AcknowledgementsScreen({super.key});
 
   static const List<String> _sponsors = [
+    'ethene',
     'WJY',
     '寰宇BH4HAP',
     '楚龙'

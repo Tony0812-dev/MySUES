@@ -24,7 +24,7 @@ class EggScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              '工程、管理、设计',
+              '工程 管理 设计',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
