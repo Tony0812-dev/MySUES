@@ -6,6 +6,7 @@ class AcknowledgementsScreen extends StatelessWidget {
   static const List<String> _sponsors = [
     'WJY',
     '寰宇BH4HAP',
+    '楚龙'
   ];
 
   @override
@@ -25,7 +26,7 @@ class AcknowledgementsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '感谢以下用户对本项目的赞助（排名不分先后）',
+              '衷心感谢以下用户对本项目的赞助（排名不分先后）',
               style: TextStyle(fontSize: 13, color: Colors.grey[500]),
             ),
             const SizedBox(height: 16),
