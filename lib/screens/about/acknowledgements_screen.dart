@@ -5,9 +5,11 @@ class AcknowledgementsScreen extends StatelessWidget {
 
   static const List<String> _sponsors = [
     'ethene',
+    'xi08',
     'WJY',
     '寰宇BH4HAP',
-    '楚龙'
+    '楚龙',
+    'a1375625918'
   ];
 
   @override

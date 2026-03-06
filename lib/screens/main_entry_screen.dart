@@ -11,9 +11,19 @@ import 'exam_info_screen.dart';
 import 'profile_screen.dart';
 import 'about/user_agreement_screen.dart';
 import 'about/privacy_policy_screen.dart';
+import 'onboarding_screen.dart';
 
 class MainEntryScreen extends StatefulWidget {
   const MainEntryScreen({super.key});
+
+  /// Call this from other screens (e.g. About) to re-show the tutorial.
+  static void showOnboarding(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const OnboardingScreen(isReview: true),
+      ),
+    );
+  }
 
   @override
   State<MainEntryScreen> createState() => _MainEntryScreenState();
@@ -43,6 +53,14 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showAgreementDialog();
       });
+    } else {
+      // Agreement already accepted — check onboarding
+      final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+      if (!onboardingCompleted && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showOnboarding(prefs);
+        });
+      }
     }
   }
 
@@ -154,6 +172,8 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
                   }
+                  // Show onboarding after agreement
+                  _showOnboarding(prefs);
                 },
                 child: const Text('同意并继续'),
               ),
@@ -162,6 +182,14 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showOnboarding(SharedPreferences prefs) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+    );
+    await prefs.setBool('onboarding_completed', true);
   }
 
   @override
