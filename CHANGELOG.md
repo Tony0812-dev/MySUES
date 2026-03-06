@@ -2,6 +2,14 @@
 
 MySUES follows [Semantic Versioning 2.0.0](http://semver.org/).
 
+## 1.0.0
+
+`2026-03-07`
+
+- 🌟 Add onboarding tutorial screen, auto-shown on first launch, reviewable from About page. @HsxMark
+- 🛠 Update acknowledgements with new sponsors. @HsxMark
+- 🛠 Adjust egg screen layout styling. @HsxMark
+
 ## 0.4.0-beta.1
 
 `2026-03-06`

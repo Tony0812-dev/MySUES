@@ -20,15 +20,15 @@ class EggScreen extends StatelessWidget {
             SvgPicture.asset(
               'assets/images/sanxuanyi.svg',
               colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              width: 150,
+              width: 120,
             ),
             const SizedBox(height: 24),
             const Text(
-              '工程 管理 设计',
+              '工程  管理  设计',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 20,
+                fontSize: 24,
               ),
             ),
           ],

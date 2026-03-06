@@ -15,6 +15,17 @@ class ChangelogScreen extends StatelessWidget {
         children: [
           _buildVersionCard(
             context,
+            version: '1.0.0',
+            date: '2026-03-07',
+            changes: [
+              '🌟 新增应用使用教程引导页面，首次启动后自动展示，支持在关于页面重新查看',
+              '🛠 更新致谢名单，新增赞助者',
+              '🛠 调整彩蛋页面布局样式',
+            ],
+            isLatest: true,
+          ),
+          _buildVersionCard(
+            context,
             version: '0.4.0-beta.1',
             date: '2026-03-06',
             changes: [
@@ -29,7 +40,6 @@ class ChangelogScreen extends StatelessWidget {
               '🛠 更新应用包名和启动页',
               '🛠 更新 iOS 端 Flutter 配置',
             ],
-            isLatest: true,
           ),
           _buildVersionCard(
             context,
