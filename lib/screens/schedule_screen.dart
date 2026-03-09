@@ -13,6 +13,7 @@ import 'schedule_settings_screen.dart';
 import 'import_classpdf_screen.dart'; // Import
 import 'login_webview_screen.dart'; // Import
 import '../utils/sync_disclaimer.dart';
+import '../utils/building_time_override.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -86,7 +87,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final start = _timeDetails.firstWhere((t) => t.node == course.startNode);
       final endNode = course.startNode + course.step - 1;
       final end = _timeDetails.firstWhere((t) => t.node == endNode);
-      return '${start.startTime} - ${end.endTime}';
+
+      // 特殊教学楼覆盖：根据教室判断是否使用特殊时间
+      final startTime = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode)
+          ?? start.startTime;
+      final endTime = BuildingTimeOverride.getOverrideEndTime(course.room, endNode)
+          ?? end.endTime;
+      return '$startTime - $endTime';
     } catch (e) {
       return '';
     }
@@ -159,7 +166,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // 否则从时间表查找对应节次的标准开始时间（结果等同于旧逻辑的格子顶部）
     try {
       final detail = _timeDetails.firstWhere((t) => t.node == course.startNode);
-      return _timeMinutesToPosition(_parseTime(detail.startTime));
+      // 特殊教学楼覆盖
+      final startTime = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode)
+          ?? detail.startTime;
+      return _timeMinutesToPosition(_parseTime(startTime));
     } catch (_) {
       return (course.startNode - 1) * _cellHeight;
     }
@@ -187,8 +197,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         final startDetail = _timeDetails.firstWhere((t) => t.node == course.startNode);
         final endNode = course.startNode + course.step - 1;
         final endDetail = _timeDetails.firstWhere((t) => t.node == endNode);
-        startMinutes = _parseTime(startDetail.startTime);
-        endMinutes = _parseTime(endDetail.endTime);
+        // 特殊教学楼覆盖
+        final overrideStart = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode);
+        final overrideEnd = BuildingTimeOverride.getOverrideEndTime(course.room, endNode);
+        startMinutes = _parseTime(overrideStart ?? startDetail.startTime);
+        endMinutes = _parseTime(overrideEnd ?? endDetail.endTime);
       } catch (_) {
         return course.step * _cellHeight;
       }
@@ -1132,11 +1145,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       String? startTimeStr;
       if (course.startTime != null && course.startTime!.isNotEmpty) {
         startTimeStr = course.startTime;
-      } else if (_timeDetails.isNotEmpty) {
-        try {
-          final detail = _timeDetails.firstWhere((d) => d.node == course.startNode);
-          startTimeStr = detail.startTime;
-        } catch (_) {}
+      } else {
+        // 优先使用教学楼覆盖时间
+        final override = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode);
+        if (override != null) {
+          startTimeStr = override;
+        } else if (_timeDetails.isNotEmpty) {
+          try {
+            final detail = _timeDetails.firstWhere((d) => d.node == course.startNode);
+            startTimeStr = detail.startTime;
+          } catch (_) {}
+        }
       }
 
       // Adjust styles for non-current week
