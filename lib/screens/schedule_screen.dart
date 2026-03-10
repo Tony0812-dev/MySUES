@@ -649,15 +649,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       appBar: AppBar(
         title: GestureDetector(
           onTap: () => _showScheduleManager(context),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_currentTable!.tableName),
-              const Icon(Icons.arrow_drop_down)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_currentTable!.tableName, style: const TextStyle(fontSize: 14)),
+                  const Icon(Icons.arrow_drop_down, size: 18),
+                ],
+              ),
+              Text(
+                '第 $_currentWeek 周',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
             ],
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: ThemeService().liquidGlassEnabled ? Colors.transparent : null,
         elevation: ThemeService().liquidGlassEnabled ? 0 : null,
         actions: [
@@ -977,16 +987,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         
         return Column(
           children: [
-            // Week number header
-            Container(
-              height: 30, // Small height for week number
-              alignment: Alignment.center,
-              color: Colors.grey.withValues(alpha: 0.05),
-              child: Text(
-                 "第 $weekNum 周",
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
             // Header (Date)
             SizedBox(
               height: _headerHeight,
