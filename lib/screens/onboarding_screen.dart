@@ -22,7 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description: '一站式校园信息助手，让你的校园生活更便捷。',
     ),
     _PageData(
-      image: 'assets/images/example/scheduledaily.PNG',
+      image: 'assets/images/example/scheduledaily.png',
       secondaryImage: 'assets/images/example/scheduleinfo.PNG',
       isLogo: false,
       title: '查看课表',
