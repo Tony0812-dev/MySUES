@@ -3,7 +3,7 @@ import SwiftUI
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(),  title: "测试课表标题 | 3.5 周四", week: "第 1 周", courses: [
+        SimpleEntry(date: Date(),  title: "3.12 周四", week: "第 1 周", courses: [
             CourseEntry(name: "测试课程", time: "22:30", endTime: "22:50", loc: "实训楼 王俊烨", colorIdx: 0),
             CourseEntry(name: "课程2", time: "23:00", endTime: "23:30", loc: "交通楼12 张三", colorIdx: 1)
         ])
@@ -14,18 +14,60 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        let entry = loadData()
-        let timeline = Timeline(entries: [entry], policy: .atEnd)
-        completion(timeline)
-    }
-    
-    func loadData() -> SimpleEntry {
         let sharedDefaults = UserDefaults(suiteName: "group.com.hsxmark.mysues")
         let title = sharedDefaults?.string(forKey: "title") ?? "今日无课"
         let week = sharedDefaults?.string(forKey: "week") ?? ""
         
+        let allCourses = loadAllCourses(from: sharedDefaults)
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Build timeline entries: one for now, and one after each course ends
+        var entries: [SimpleEntry] = []
+        
+        // Collect unique end-time dates (today) for courses that haven't ended yet
+        var refreshDates: [Date] = [now]
+        for course in allCourses {
+            if let endDate = todayDate(from: course.endTime, calendar: calendar), endDate > now {
+                refreshDates.append(endDate)
+            }
+        }
+        refreshDates.sort()
+        // Remove duplicates
+        refreshDates = refreshDates.reduce(into: []) { result, date in
+            if result.last != date { result.append(date) }
+        }
+        
+        for date in refreshDates {
+            let remaining = allCourses.filter { course in
+                guard let endDate = todayDate(from: course.endTime, calendar: calendar) else {
+                    return true // Can't determine end time, keep it
+                }
+                return endDate > date
+            }
+            let reindexed = remaining.enumerated().map { (idx, c) in
+                CourseEntry(name: c.name, time: c.time, endTime: c.endTime, loc: c.loc, colorIdx: idx % 2)
+            }
+            entries.append(SimpleEntry(date: date, title: title, week: week, courses: reindexed))
+        }
+        
+        // After all courses end, show empty state
+        if let lastEnd = allCourses.compactMap({ todayDate(from: $0.endTime, calendar: calendar) }).max(), lastEnd > now {
+            entries.append(SimpleEntry(date: lastEnd, title: title, week: week, courses: []))
+        }
+        
+        if entries.isEmpty {
+            entries.append(SimpleEntry(date: now, title: title, week: week, courses: []))
+        }
+        
+        let timeline = Timeline(entries: entries, policy: .atEnd)
+        completion(timeline)
+    }
+    
+    func loadAllCourses(from sharedDefaults: UserDefaults?) -> [CourseEntry] {
         var courses: [CourseEntry] = []
-        for i in 1...6 {
+        for i in 1...8 {
             let name = sharedDefaults?.string(forKey: "course_\(i)_name") ?? ""
             if !name.isEmpty {
                 let time = sharedDefaults?.string(forKey: "course_\(i)_time") ?? ""
@@ -34,8 +76,33 @@ struct Provider: TimelineProvider {
                 courses.append(CourseEntry(name: name, time: time, endTime: endTime, loc: loc, colorIdx: (i-1) % 2))
             }
         }
+        return courses
+    }
+    
+    func todayDate(from timeStr: String, calendar: Calendar) -> Date? {
+        guard !timeStr.isEmpty else { return nil }
+        let parts = timeStr.split(separator: ":")
+        guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]) else { return nil }
+        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: Date())
+    }
+    
+    func loadData() -> SimpleEntry {
+        let sharedDefaults = UserDefaults(suiteName: "group.com.hsxmark.mysues")
+        let title = sharedDefaults?.string(forKey: "title") ?? "今日无课"
+        let week = sharedDefaults?.string(forKey: "week") ?? ""
         
-        return SimpleEntry(date: Date(), title: title, week: week, courses: courses)
+        let now = Date()
+        let calendar = Calendar.current
+        let allCourses = loadAllCourses(from: sharedDefaults)
+        let remaining = allCourses.filter { course in
+            guard let endDate = todayDate(from: course.endTime, calendar: calendar) else { return true }
+            return endDate > now
+        }
+        let reindexed = remaining.enumerated().map { (idx, c) in
+            CourseEntry(name: c.name, time: c.time, endTime: c.endTime, loc: c.loc, colorIdx: idx % 2)
+        }
+        
+        return SimpleEntry(date: now, title: title, week: week, courses: reindexed)
     }
 }
 
@@ -56,8 +123,12 @@ struct SimpleEntry: TimelineEntry {
 
 struct ScheduleWidgetEntryView : View {
     var entry: Provider.Entry
+    @Environment(\.widgetFamily) var family
 
     var body: some View {
+        let maxCourses = family == .systemLarge ? 8 : 4
+        let visibleCourses = Array(entry.courses.prefix(maxCourses))
+        
         VStack(spacing: 0) {
             HStack {
                 Text(entry.title)
@@ -70,7 +141,7 @@ struct ScheduleWidgetEntryView : View {
             }
             .padding(.bottom, 12)
             
-            if entry.courses.isEmpty {
+            if visibleCourses.isEmpty {
                 Spacer()
                 Text("享受美好的空闲时光~")
                     .foregroundColor(.gray)
@@ -78,7 +149,7 @@ struct ScheduleWidgetEntryView : View {
                 Spacer()
             } else {
                 VStack(spacing: 8) {
-                    ForEach(entry.courses, id: \.self) { course in
+                    ForEach(visibleCourses, id: \.self) { course in
                         HStack(spacing: 8) {
                             Rectangle()
                                 .fill(course.colorIdx == 0 ? Color(red: 46/255, green: 204/255, blue: 113/255) : Color(red: 243/255, green: 156/255, blue: 18/255))
