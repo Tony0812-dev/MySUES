@@ -60,8 +60,12 @@ class _DailyScheduleScreenState extends State<DailyScheduleScreen> {
 
     await ScheduleDataService.initDefaultData();
 
-    final tables = await ScheduleDataService.loadScheduleTables();
-    final currentTableId = await ScheduleDataService.getCurrentTableId();
+    final results = await Future.wait([
+      ScheduleDataService.loadScheduleTables(),
+      ScheduleDataService.getCurrentTableId(),
+    ]);
+    final tables = results[0] as List<ScheduleTable>;
+    final currentTableId = results[1] as int;
 
     if (tables.isNotEmpty) {
       _currentTable = tables.firstWhere(
@@ -72,8 +76,12 @@ class _DailyScheduleScreenState extends State<DailyScheduleScreen> {
 
     if (_currentTable != null) {
       _currentWeek = _calculateCurrentWeek(_currentTable!.startDateObj);
-      _courses = await ScheduleDataService.loadCourses(tableId: _currentTable!.id);
-      _timeDetails = await ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId);
+      final dataResults = await Future.wait([
+        ScheduleDataService.loadCourses(tableId: _currentTable!.id),
+        ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId),
+      ]);
+      _courses = dataResults[0] as List<Course>;
+      _timeDetails = dataResults[1] as List<TimeDetail>;
 
       // 计算学期起始周一和总天数
       _semesterStart = _currentTable!.startDateObj.subtract(

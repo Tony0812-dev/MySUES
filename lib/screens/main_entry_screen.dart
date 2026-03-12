@@ -32,13 +32,19 @@ class MainEntryScreen extends StatefulWidget {
 class _MainEntryScreenState extends State<MainEntryScreen> {
   int _currentIndex = 0;
 
-  // 页面列表
-  final List<Widget> _pages = [
-    const ScheduleViewContainer(),
-    const TranscriptScreen(),
-    const ExamInfoScreen(),
-    const ProfileScreen(),
-  ];
+  // 懒加载：只有被访问过的 Tab 才会真正构建，避免首次进入时同时初始化全部页面
+  final List<Widget?> _cachedPages = [null, null, null, null];
+
+  Widget _getPage(int index) {
+    _cachedPages[index] ??= switch (index) {
+      0 => const ScheduleViewContainer(),
+      1 => const TranscriptScreen(),
+      2 => const ExamInfoScreen(),
+      3 => const ProfileScreen(),
+      _ => const SizedBox.shrink(),
+    };
+    return _cachedPages[index]!;
+  }
 
   @override
   void initState() {
@@ -206,7 +212,12 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
           backgroundColor: hasBg ? Colors.transparent : null,
           body: IndexedStack(
             index: _currentIndex,
-            children: _pages,
+            children: List.generate(4, (i) {
+              if (_cachedPages[i] == null && i != _currentIndex) {
+                return const SizedBox.shrink();
+              }
+              return _getPage(i);
+            }),
           ),
           bottomNavigationBar: useLiquidGlass 
             ? LiquidGlassBottomBar(

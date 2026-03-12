@@ -11,10 +11,15 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   late VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _navigated = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final String asset = isDark
         ? 'assets/videos/splash-night.mp4'
@@ -28,12 +33,17 @@ class _SplashScreenState extends State<SplashScreen> {
       });
 
     _controller.addListener(() {
-      if (!mounted) return;
+      if (!mounted || _navigated) return;
       if (_controller.value.isInitialized &&
           !_controller.value.isPlaying &&
           _controller.value.position >= _controller.value.duration) {
+        _navigated = true;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainEntryScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const MainEntryScreen(),
+            transitionDuration: Duration.zero,
+          ),
         );
       }
     });

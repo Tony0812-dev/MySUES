@@ -50,8 +50,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Ensure default data exists
     await ScheduleDataService.initDefaultData();
     
-    final tables = await ScheduleDataService.loadScheduleTables();
-    final currentTableId = await ScheduleDataService.getCurrentTableId();
+    // 并行加载课表列表和当前课表ID
+    final results = await Future.wait([
+      ScheduleDataService.loadScheduleTables(),
+      ScheduleDataService.getCurrentTableId(),
+    ]);
+    final tables = results[0] as List<ScheduleTable>;
+    final currentTableId = results[1] as int;
     
     if (tables.isNotEmpty) {
       _currentTable = tables.firstWhere(
@@ -63,10 +68,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (_currentTable != null) {
       // Calculate current week
       _currentWeek = _calculateCurrentWeek(_currentTable!.startDateObj);
-      // Load courses
-      _courses = await ScheduleDataService.loadCourses(tableId: _currentTable!.id);
-      // Load time details
-      _timeDetails = await ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId);
+      // 并行加载课程和时间详情
+      final dataResults = await Future.wait([
+        ScheduleDataService.loadCourses(tableId: _currentTable!.id),
+        ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId),
+      ]);
+      _courses = dataResults[0] as List<Course>;
+      _timeDetails = dataResults[1] as List<TimeDetail>;
       
       // Update UI settings
       _cellHeight = _currentTable!.itemHeight.toDouble();
