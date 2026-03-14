@@ -160,26 +160,7 @@ class _ExamInfoScreenState extends State<ExamInfoScreen> {
         ],
       ),
       body: Column(
-        children: [
-          // Disclaimer
-          Container(
-            width: double.infinity,
-            color: Colors.red[50],
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 16, color: Colors.red),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: const Text(
-                    '考试信息非即时获取，仅供参考，请以教务处系统提示为准！',
-                    style: TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
+        children: [          
           // Filter
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),

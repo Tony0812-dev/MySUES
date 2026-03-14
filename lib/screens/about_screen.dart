@@ -98,8 +98,6 @@ class _AboutScreenState extends State<AboutScreen> {
                 _buildOptionItem(context, '开源信息', const OpenSourceLicenseScreen()),
                 const Divider(height: 1, indent: 16),
                 _buildOptionItem(context, '作者', const SponsorScreen()),
-                const Divider(height: 1, indent: 16),
-                _buildOptionItem(context, '鸣谢', const AcknowledgementsScreen()),
               ],
             ),
           ),
