@@ -5,15 +5,25 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mysues/services/theme_service.dart';
 import 'package:mysues/widgets/liquid_glass_bottom_bar.dart';
-import 'schedule_screen.dart';
+import 'schedule_view_container.dart';
 import 'transcript_screen.dart';
 import 'exam_info_screen.dart';
 import 'profile_screen.dart';
 import 'about/user_agreement_screen.dart';
 import 'about/privacy_policy_screen.dart';
+import 'onboarding_screen.dart';
 
 class MainEntryScreen extends StatefulWidget {
   const MainEntryScreen({super.key});
+
+  /// Call this from other screens (e.g. About) to re-show the tutorial.
+  static void showOnboarding(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const OnboardingScreen(isReview: true),
+      ),
+    );
+  }
 
   @override
   State<MainEntryScreen> createState() => _MainEntryScreenState();
@@ -22,13 +32,19 @@ class MainEntryScreen extends StatefulWidget {
 class _MainEntryScreenState extends State<MainEntryScreen> {
   int _currentIndex = 0;
 
-  // 页面列表
-  final List<Widget> _pages = [
-    const ScheduleScreen(),
-    const TranscriptScreen(),
-    const ExamInfoScreen(),
-    const ProfileScreen(),
-  ];
+  // 懒加载：只有被访问过的 Tab 才会真正构建，避免首次进入时同时初始化全部页面
+  final List<Widget?> _cachedPages = [null, null, null, null];
+
+  Widget _getPage(int index) {
+    _cachedPages[index] ??= switch (index) {
+      0 => ScheduleViewContainer(key: ScheduleViewContainer.containerKey),
+      1 => const TranscriptScreen(),
+      2 => const ExamInfoScreen(),
+      3 => const ProfileScreen(),
+      _ => const SizedBox.shrink(),
+    };
+    return _cachedPages[index]!;
+  }
 
   @override
   void initState() {
@@ -43,6 +59,14 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showAgreementDialog();
       });
+    } else {
+      // Agreement already accepted — check onboarding
+      final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+      if (!onboardingCompleted && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showOnboarding(prefs);
+        });
+      }
     }
   }
 
@@ -154,6 +178,8 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
                   }
+                  // Show onboarding after agreement
+                  _showOnboarding(prefs);
                 },
                 child: const Text('同意并继续'),
               ),
@@ -162,6 +188,14 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showOnboarding(SharedPreferences prefs) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+    );
+    await prefs.setBool('onboarding_completed', true);
   }
 
   @override
@@ -178,7 +212,12 @@ class _MainEntryScreenState extends State<MainEntryScreen> {
           backgroundColor: hasBg ? Colors.transparent : null,
           body: IndexedStack(
             index: _currentIndex,
-            children: _pages,
+            children: List.generate(4, (i) {
+              if (_cachedPages[i] == null && i != _currentIndex) {
+                return const SizedBox.shrink();
+              }
+              return _getPage(i);
+            }),
           ),
           bottomNavigationBar: useLiquidGlass 
             ? LiquidGlassBottomBar(

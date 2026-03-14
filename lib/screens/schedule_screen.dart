@@ -10,20 +10,29 @@ import '../services/schedule_service.dart';
 import '../services/theme_service.dart';
 import 'add_course_screen.dart';
 import 'schedule_settings_screen.dart';
+import 'schedule_view_container.dart';
 import 'import_classpdf_screen.dart'; // Import
 import 'login_webview_screen.dart'; // Import
 import '../utils/sync_disclaimer.dart';
+import '../utils/building_time_override.dart';
 
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key});
+  final VoidCallback? onSwitchToDaily;
+
+  const ScheduleScreen({super.key, this.onSwitchToDaily});
+
+  /// Static reference to current state (avoids GlobalKey conflicts with AnimatedSwitcher)
+  static ScheduleScreenState? _currentState;
+  static ScheduleScreenState? get currentState => _currentState;
 
   @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
+  State<ScheduleScreen> createState() => ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class ScheduleScreenState extends State<ScheduleScreen> {
   late PageController _pageController;
   int _currentWeek = 1;
+  int _actualCurrentWeek = 1;
   ScheduleTable? _currentTable;
   List<Course> _courses = [];
   List<TimeDetail> _timeDetails = []; // Store time details
@@ -34,11 +43,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   double _headerHeight = 50.0;
   double _cellHeight = 60.0; // Default, will override
 
+  // Public API for floating button
+  int get currentWeek => _currentWeek;
+  int get actualCurrentWeek => _actualCurrentWeek;
+  int get maxWeek => _currentTable?.maxWeek ?? 30;
+  bool get isOnActualCurrentWeek => _currentWeek == _actualCurrentWeek;
+  bool get showFloatingButton => _currentTable?.showFloatingButton ?? true;
+
+  void jumpToWeek(int week) {
+    final page = (week - 1).clamp(0, maxWeek - 1);
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void jumpToActualCurrentWeek() {
+    jumpToWeek(_actualCurrentWeek);
+  }
+
   @override
   void initState() {
     super.initState();
+    ScheduleScreen._currentState = this;
     _pageController = PageController(initialPage: 0);
     _initData();
+  }
+
+  @override
+  void dispose() {
+    if (ScheduleScreen._currentState == this) {
+      ScheduleScreen._currentState = null;
+    }
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _initData() async {
@@ -47,8 +86,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Ensure default data exists
     await ScheduleDataService.initDefaultData();
     
-    final tables = await ScheduleDataService.loadScheduleTables();
-    final currentTableId = await ScheduleDataService.getCurrentTableId();
+    // 并行加载课表列表和当前课表ID
+    final results = await Future.wait([
+      ScheduleDataService.loadScheduleTables(),
+      ScheduleDataService.getCurrentTableId(),
+    ]);
+    final tables = results[0] as List<ScheduleTable>;
+    final currentTableId = results[1] as int;
     
     if (tables.isNotEmpty) {
       _currentTable = tables.firstWhere(
@@ -60,10 +104,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (_currentTable != null) {
       // Calculate current week
       _currentWeek = _calculateCurrentWeek(_currentTable!.startDateObj);
-      // Load courses
-      _courses = await ScheduleDataService.loadCourses(tableId: _currentTable!.id);
-      // Load time details
-      _timeDetails = await ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId);
+      _actualCurrentWeek = _currentWeek;
+      // 并行加载课程和时间详情
+      final dataResults = await Future.wait([
+        ScheduleDataService.loadCourses(tableId: _currentTable!.id),
+        ScheduleDataService.loadTimeDetails(timeTableId: _currentTable!.timeTableId),
+      ]);
+      _courses = dataResults[0] as List<Course>;
+      _timeDetails = dataResults[1] as List<TimeDetail>;
       
       // Update UI settings
       _cellHeight = _currentTable!.itemHeight.toDouble();
@@ -73,8 +121,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     setState(() => _isLoading = false);
+    // Notify container to show FAB after data is ready
+    ScheduleViewContainer.containerKey.currentState?.setState(() {});
   }
-  
+
   // _injectDemoCourses removed here
   
   String _getTimeRange(Course course) {
@@ -86,7 +136,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final start = _timeDetails.firstWhere((t) => t.node == course.startNode);
       final endNode = course.startNode + course.step - 1;
       final end = _timeDetails.firstWhere((t) => t.node == endNode);
-      return '${start.startTime} - ${end.endTime}';
+
+      // 特殊教学楼覆盖：根据教室判断是否使用特殊时间
+      final startTime = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode)
+          ?? start.startTime;
+      final endTime = BuildingTimeOverride.getOverrideEndTime(course.room, endNode)
+          ?? end.endTime;
+      return '$startTime - $endTime';
     } catch (e) {
       return '';
     }
@@ -102,14 +158,107 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  /// 将分钟数转换为网格内的像素位置。
+  /// 以标准节次格子为锚点，在同一个节次内按时间比例插值定位。
+  /// 课间休息不占用额外视觉空间，非标准时间的课程会在格子内偏移。
+  double _timeMinutesToPosition(int minutes) {
+    if (_timeDetails.isEmpty) return 0;
+
+    final firstStart = _parseTime(_timeDetails.first.startTime);
+    if (minutes <= firstStart) return 0;
+
+    final lastEnd = _parseTime(_timeDetails.last.endTime);
+    if (minutes >= lastEnd) return _currentTable!.nodes * _cellHeight;
+
+    for (int i = 0; i < _timeDetails.length; i++) {
+      final pStart = _parseTime(_timeDetails[i].startTime);
+      final pEnd = _parseTime(_timeDetails[i].endTime);
+      final slotTop = (_timeDetails[i].node - 1) * _cellHeight;
+      final slotBottom = _timeDetails[i].node * _cellHeight;
+
+      // 落在本节次时间范围内 → 在格子内按比例插值
+      if (minutes >= pStart && minutes <= pEnd) {
+        final fraction = (pEnd > pStart)
+            ? (minutes - pStart) / (pEnd - pStart)
+            : 0.0;
+        return slotTop + fraction * (slotBottom - slotTop);
+      }
+
+      // 落在课间休息（本节次结束 ~ 下节次开始）
+      if (i + 1 < _timeDetails.length) {
+        final nextPStart = _parseTime(_timeDetails[i + 1].startTime);
+        if (minutes > pEnd && minutes < nextPStart) {
+          // 课间休息在网格中没有独立空间，线性插值到下一格子边界
+          final nextSlotTop = (_timeDetails[i + 1].node - 1) * _cellHeight;
+          final fraction = (nextPStart > pEnd)
+              ? (minutes - pEnd) / (nextPStart - pEnd)
+              : 0.0;
+          return slotBottom + fraction * (nextSlotTop - slotBottom);
+        }
+      }
+    }
+
+    return 0;
+  }
+
   double _calculateTop(Course course) {
-    // 强制使用节次计算，避免因课件时间包含课间休息导致色块错位
-    return (course.startNode - 1) * _cellHeight;
+    if (_timeDetails.isEmpty) {
+      return (course.startNode - 1) * _cellHeight;
+    }
+
+    // 优先使用课程自带的开始时间
+    if (course.startTime != null && course.startTime!.isNotEmpty) {
+      final m = _parseTime(course.startTime!);
+      if (m > 0) return _timeMinutesToPosition(m);
+    }
+
+    // 否则从时间表查找对应节次的标准开始时间（结果等同于旧逻辑的格子顶部）
+    try {
+      final detail = _timeDetails.firstWhere((t) => t.node == course.startNode);
+      // 特殊教学楼覆盖
+      final startTime = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode)
+          ?? detail.startTime;
+      return _timeMinutesToPosition(_parseTime(startTime));
+    } catch (_) {
+      return (course.startNode - 1) * _cellHeight;
+    }
   }
   
   double _calculateHeight(Course course) {
-     // 强制使用节次计算，避免因课件时间包含课间休息导致色块超出网格
-     return course.step * _cellHeight;
+    if (_timeDetails.isEmpty) {
+      return course.step * _cellHeight;
+    }
+
+    int? startMinutes;
+    int? endMinutes;
+
+    // 优先使用课程自带的起止时间
+    if (course.startTime != null && course.startTime!.isNotEmpty &&
+        course.endTime != null && course.endTime!.isNotEmpty) {
+      startMinutes = _parseTime(course.startTime!);
+      endMinutes = _parseTime(course.endTime!);
+    }
+
+    // 若没有自定义时间，从时间表查找对应节次的标准起止时间
+    if (startMinutes == null || endMinutes == null ||
+        startMinutes == 0 || endMinutes == 0) {
+      try {
+        final startDetail = _timeDetails.firstWhere((t) => t.node == course.startNode);
+        final endNode = course.startNode + course.step - 1;
+        final endDetail = _timeDetails.firstWhere((t) => t.node == endNode);
+        // 特殊教学楼覆盖
+        final overrideStart = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode);
+        final overrideEnd = BuildingTimeOverride.getOverrideEndTime(course.room, endNode);
+        startMinutes = _parseTime(overrideStart ?? startDetail.startTime);
+        endMinutes = _parseTime(overrideEnd ?? endDetail.endTime);
+      } catch (_) {
+        return course.step * _cellHeight;
+      }
+    }
+
+    final h = _timeMinutesToPosition(endMinutes) - _timeMinutesToPosition(startMinutes);
+    // 保证最小高度，避免极短课程不可见
+    return h >= _cellHeight * 0.5 ? h : course.step * _cellHeight;
   }
 
   void _showCourseDetail(BuildContext context, Course course) {
@@ -413,9 +562,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                        icon: const Icon(Icons.add),
                        onPressed: () async {
                          Navigator.pop(context);
+                         final existingNames = tables.map((t) => t.tableName).toList();
                          final newTable = await Navigator.push(
                            context,
-                           MaterialPageRoute(builder: (c) => const ScheduleSettingsScreen()),
+                           MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(existingNames: existingNames)),
                          );
                          if (newTable != null && newTable is ScheduleTable) {
                            await ScheduleDataService.addScheduleTable(newTable);
@@ -523,9 +673,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () async {
+                    final allTables = await ScheduleDataService.loadScheduleTables();
+                    final existingNames = allTables.map((t) => t.tableName).toList();
+                    if (!context.mounted) return;
                     final newTable = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (c) => const ScheduleSettingsScreen()),
+                      MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(existingNames: existingNames)),
                     );
                     if (newTable != null && newTable is ScheduleTable) {
                       await ScheduleDataService.addScheduleTable(newTable);
@@ -545,18 +698,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       appBar: AppBar(
         title: GestureDetector(
           onTap: () => _showScheduleManager(context),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_currentTable!.tableName),
-              const Icon(Icons.arrow_drop_down)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_currentTable!.tableName, style: const TextStyle(fontSize: 14)),
+                  const Icon(Icons.arrow_drop_down, size: 18),
+                ],
+              ),
+              Text(
+                '第 $_currentWeek 周',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
             ],
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: ThemeService().liquidGlassEnabled ? Colors.transparent : null,
         elevation: ThemeService().liquidGlassEnabled ? 0 : null,
         actions: [
+          Tooltip(
+            message: '切换到日视图',
+            child: IconButton(
+              onPressed: widget.onSwitchToDaily,
+              icon: const Icon(Icons.view_day_outlined, size: 22),
+            ),
+          ),
           ListenableBuilder(
             listenable: ThemeService(),
             builder: (context, _) {
@@ -637,9 +807,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     leadingIcon: const Icon(Icons.settings),
                     onPressed: () async {
                       if (_currentTable != null) {
+                        final allTables = await ScheduleDataService.loadScheduleTables();
+                        final existingNames = allTables
+                            .where((t) => t.id != _currentTable!.id)
+                            .map((t) => t.tableName)
+                            .toList();
+                        if (!context.mounted) return;
                         final newTable = await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!)),
+                          MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!, existingNames: existingNames)),
                         );
                         if (newTable != null && newTable is ScheduleTable) {
                           await ScheduleDataService.updateScheduleTable(newTable);
@@ -662,23 +838,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           setState(() {
             _currentWeek = page + 1;
           });
+          // Notify container to refresh FAB label
+          ScheduleViewContainer.containerKey.currentState?.setState(() {});
         },
         itemBuilder: (context, index) {
           final weekNum = index + 1;
           return _buildWeekSchedule(weekNum);
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: '回到本周',
-        onPressed: () {
-           if (_currentTable != null) {
-              int todayWeek = _calculateCurrentWeek(_currentTable!.startDateObj);
-              // clamp to valid range
-              final targetPage = (todayWeek - 1).clamp(0, _currentTable!.maxWeek - 1);
-              _pageController.jumpToPage(targetPage);
-           }
-        },
-        child: const Icon(Icons.today),
       ),
     );
   }
@@ -789,9 +955,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                             onTap: () async {
                               Navigator.pop(dialogContext);
                               if (_currentTable != null) {
+                                final allTables = await ScheduleDataService.loadScheduleTables();
+                                final existingNames = allTables
+                                    .where((t) => t.id != _currentTable!.id)
+                                    .map((t) => t.tableName)
+                                    .toList();
+                                if (!context.mounted) return;
                                 final newTable = await Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!)),
+                                  MaterialPageRoute(builder: (c) => ScheduleSettingsScreen(table: _currentTable!, existingNames: existingNames)),
                                 );
                                 if (newTable != null && newTable is ScheduleTable) {
                                   await ScheduleDataService.updateScheduleTable(newTable);
@@ -873,16 +1045,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         
         return Column(
           children: [
-            // Week number header
-            Container(
-              height: 30, // Small height for week number
-              alignment: Alignment.center,
-              color: Colors.grey.withValues(alpha: 0.05),
-              child: Text(
-                 "第 $weekNum 周",
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
             // Header (Date)
             SizedBox(
               height: _headerHeight,
@@ -1037,13 +1199,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final top = _calculateTop(course);
       final height = _calculateHeight(course);
 
-      // Get start time string
+      // Get start time string — 优先使用课程自带的 startTime
       String? startTimeStr;
-      if (_timeDetails.isNotEmpty) {
-        try {
-          final detail = _timeDetails.firstWhere((d) => d.node == course.startNode);
-          startTimeStr = detail.startTime;
-        } catch (_) {}
+      if (course.startTime != null && course.startTime!.isNotEmpty) {
+        startTimeStr = course.startTime;
+      } else {
+        // 优先使用教学楼覆盖时间
+        final override = BuildingTimeOverride.getOverrideStartTime(course.room, course.startNode);
+        if (override != null) {
+          startTimeStr = override;
+        } else if (_timeDetails.isNotEmpty) {
+          try {
+            final detail = _timeDetails.firstWhere((d) => d.node == course.startNode);
+            startTimeStr = detail.startTime;
+          } catch (_) {}
+        }
       }
 
       // Adjust styles for non-current week

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/MySUES-1024x1024@1x.png" width="150" alt="MySUES Logo">
+  <img src="assets/images/example/MySUES-1024x1024@1x.png" width="150" alt="MySUES Logo">
 </p>
 
 # My SUES
@@ -50,8 +50,8 @@ If you want to run this project locally, please ensure you have the Flutter deve
 
 ## 📱 Platform Support
 
-- **Android**: Android 5.0+
-- **iOS**: iOS 11.0+
+- **Android**: Android 12.0+
+- **iOS**: iOS 14.0+
 
 ## ⚠️ Disclaimer
 

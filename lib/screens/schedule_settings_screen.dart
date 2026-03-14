@@ -3,8 +3,9 @@ import '../models/schedule_table.dart';
 
 class ScheduleSettingsScreen extends StatefulWidget {
   final ScheduleTable? table; // Null for new table
+  final List<String> existingNames;
 
-  const ScheduleSettingsScreen({super.key, this.table});
+  const ScheduleSettingsScreen({super.key, this.table, this.existingNames = const []});
 
   @override
   State<ScheduleSettingsScreen> createState() => _ScheduleSettingsScreenState();
@@ -19,6 +20,7 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
   late bool _showSat;
   late bool _showSun;
   late bool _showOtherWeekCourse;
+  late bool _showFloatingButton;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
       _showSat = widget.table!.showSat;
       _showSun = widget.table!.showSun;
       _showOtherWeekCourse = widget.table!.showOtherWeekCourse;
+      _showFloatingButton = widget.table!.showFloatingButton;
     } else {
       _nameController = TextEditingController(text: '新课表');
       _maxWeekController = TextEditingController(text: '30');
@@ -41,6 +44,7 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
       _showSat = true;
       _showSun = true;
       _showOtherWeekCourse = true;
+      _showFloatingButton = true;
     }
   }
 
@@ -116,6 +120,12 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
             value: _showOtherWeekCourse,
             onChanged: (v) => setState(() => _showOtherWeekCourse = v),
           ),
+          SwitchListTile(
+            title: const Text('显示悬浮跳转按钮'),
+            subtitle: const Text('快速跳转周次/日期'),
+            value: _showFloatingButton,
+            onChanged: (v) => setState(() => _showFloatingButton = v),
+          ),
         ],
       ),
     );
@@ -136,11 +146,37 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
   }
 
   void _save() {
-    final maxWeek = int.tryParse(_maxWeekController.text) ?? 30;
-    final nodes = int.tryParse(_nodesController.text) ?? 15;
+    final name = _nameController.text.trim();
+    final maxWeek = int.tryParse(_maxWeekController.text) ?? 0;
+    final nodes = int.tryParse(_nodesController.text) ?? 0;
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('课表名称不能为空')),
+      );
+      return;
+    }
+    if (maxWeek < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('学期周数不能少于 15 周')),
+      );
+      return;
+    }
+    if (nodes < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('每天节数不能少于 10 节')),
+      );
+      return;
+    }
+    if (widget.existingNames.contains(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('课表名称已存在，请使用其他名称')),
+      );
+      return;
+    }
 
     if (widget.table != null) {
-      widget.table!.tableName = _nameController.text;
+      widget.table!.tableName = name;
       widget.table!.startDate = _startDate;
       widget.table!.maxWeek = maxWeek;
       widget.table!.nodes = nodes;
@@ -148,10 +184,11 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
       widget.table!.showSat = _showSat;
       widget.table!.showSun = _showSun;
       widget.table!.showOtherWeekCourse = _showOtherWeekCourse;
+      widget.table!.showFloatingButton = _showFloatingButton;
       Navigator.pop(context, widget.table);
     } else {
       final newTable = ScheduleTable(
-        tableName: _nameController.text,
+        tableName: name,
         startDate: _startDate,
         maxWeek: maxWeek,
         nodes: nodes,
@@ -160,6 +197,7 @@ class _ScheduleSettingsScreenState extends State<ScheduleSettingsScreen> {
         showSat: _showSat,
         showSun: _showSun,
         showOtherWeekCourse: _showOtherWeekCourse,
+        showFloatingButton: _showFloatingButton,
       );
        Navigator.pop(context, newTable);
     }

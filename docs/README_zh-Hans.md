@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../assets/images/MySUES-1024x1024@1x.png" width="150" alt="MySUES Logo">
+  <img src="../assets/images/example/MySUES-1024x1024@1x.png" width="150" alt="MySUES Logo">
 </p>
 
 # MySUES (苏伊士)
@@ -50,8 +50,8 @@ MySUES 是由上海工程技术大学（SUES）学生开发者制作的一款校
 
 ## 📱 平台支持
 
-- **Android**: Android 5.0+
-- **iOS**: iOS 11.0+
+- **Android**: Android 12.0+
+- **iOS**: iOS 14.0+
 
 ## ⚠️ 免责声明
 

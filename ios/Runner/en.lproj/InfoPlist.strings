@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "My SUES";
 "CFBundleName" = "My SUES";
+"NSPhotoLibraryUsageDescription" = "My SUES needs access to your photos to personalize your profile picture and class schedule background.";
